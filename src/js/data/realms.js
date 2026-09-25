@@ -24,9 +24,29 @@
 
     /* 天劫 */
     TRIB_BASE_POWER: 1,           // 天劫强度基数
-    TRIB_KILL_ROUNDS: 9,
-    TRIB_SURVIVE_ROUNDS: 13,
-    TRIB_ROUNDS_PER_REALM: 0.5,
+    TRIB_KILL_ROUNDS: 9,          // 基准：你需要几回合击破天劫化身
+    TRIB_ROUNDS_PER_REALM: 0.5,   // 每个大境界双方回合数同步增长
+
+    /* 渡劫「余量」= 你能撑住的回合数 − 击破它所需的回合数。
+       旧版让两者同步增长，余量恒为 4 回合 —— 任何境界都是必胜，
+       天劫形同虚设（旧基线实测 11 战 11 胜、0 负）。
+
+       注意：反解敌方伤害时只用了「气血 / 生存回合」，**没有计入你的
+       吸血与丹药回复**，因此实际生存回合明显长于理论值。
+       所以后期必须让余量降到**负值**（敌方先把你打死）才真正有威胁，
+       再靠「渡劫准备」把它补回来。余量为负 ≠ 不可能取胜。 */
+    TRIB_MARGIN_BASE: 3.0,        // 首个大境界渡劫的余量（回合）
+    TRIB_MARGIN_DECAY: 0.75,      // 每上升一个大境界收窄的余量
+    TRIB_MIN_MARGIN: -6.0,        // 余量下限（负值 = 不布阵必败）
+
+    /* 渡劫准备：投入灵石布阵，换取本次渡劫的额外余量。
+       stoneSec 以「N 秒灵石收入」计，与锻炉 / 任务同一套换算口径。 */
+    TRIB_AID_TIERS: [
+      { id: 'none', name: '独自渡劫', rounds: 0, stoneSec: 0 },
+      { id: 'array', name: '灵石布阵', rounds: 2.5, stoneSec: 180 },
+      { id: 'grand', name: '倾力大阵', rounds: 5.0, stoneSec: 600 },
+    ],
+
     TRIB_FAIL_KEEP: 0.55,
 
     /* 灵石 */

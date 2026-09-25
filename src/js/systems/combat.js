@@ -159,16 +159,55 @@
       return Combat.makeEnemy(z.refR, z.mult * 1.55, { boss: true, name: nm, icon: '👺', prefix: '' });
     },
 
-    /* 天劫化身
-       设计：以「玩家自身实力」为基准动态生成，保证是一场
-       需要全力应对、但准备充分即可取胜的战斗。
+    /* ══════ 天劫 ══════
+       设计：以「玩家自身实力」为基准动态生成，保证你总能打到它；
+       但难度只由**「余量」这一个旋钮**控制 ——
+       余量 = 你能撑住的回合数 − 击破它所需的回合数，越小越凶险。
+       余量随境界收窄（前期从容、后期吃紧），而「渡劫准备」可以把它补回来。
        攻方回合伤害 f(x) = 3x²/(3x + D)，据此反解出敌方攻击力。 */
-    makeTribulation(nextRealm) {
-      const p = XG.State.Calc.playerStats();
-      const refR = Math.max(0, nextRealm - 0.15);
+
+    /* 本次渡劫的回合预算（生成敌人 / UI 展示 / 调参共用同一处，避免各算各的） */
+    tribPlan(nextRealm, aidRounds) {
       const power = Math.max(0.1, XG.CONFIG.TRIB_BASE_POWER || 1);
       const killRounds = Math.max(1, (XG.CONFIG.TRIB_KILL_ROUNDS + nextRealm * XG.CONFIG.TRIB_ROUNDS_PER_REALM) * power);
-      const surviveRounds = Math.max(1, (XG.CONFIG.TRIB_SURVIVE_ROUNDS + nextRealm * XG.CONFIG.TRIB_ROUNDS_PER_REALM) * power);
+      const margin = Combat.tribMargin(nextRealm, aidRounds);
+      /* 余量可为负（敌方先击破你）；生存回合仍至少留 1 回合，避免反解发散 */
+      return { power, killRounds, surviveRounds: Math.max(1, killRounds + margin * power), margin };
+    },
+
+    /* 余量（回合）：境界越高越紧，渡劫准备按档位补回 */
+    tribMargin(nextRealm, aidRounds) {
+      const c = XG.CONFIG;
+      const base = (c.TRIB_MARGIN_BASE || 0) - nextRealm * (c.TRIB_MARGIN_DECAY || 0);
+      const aid = Math.max(0, Number(aidRounds) || 0);
+      return Math.max(c.TRIB_MIN_MARGIN || 0, base) + aid;
+    },
+
+    /* 渡劫准备档位（含按当前灵石收入折算出的花费） */
+    tribAidTiers() {
+      const unit = Combat.stoneUnit();
+      return (XG.CONFIG.TRIB_AID_TIERS || []).map(t => ({
+        id: t.id, name: t.name, rounds: t.rounds,
+        cost: Math.max(0, Math.floor(unit * (t.stoneSec || 0))),
+      }));
+    },
+
+    /* 自动模式用：挑付得起的最高档。
+       否则后期天劫可能打不过，挂机会永久卡在境界门口。 */
+    bestAffordableTribAid() {
+      const stone = XG.State.s.res.stone;
+      const affordable = Combat.tribAidTiers().filter(t => t.cost <= stone);
+      return affordable.length
+        ? affordable[affordable.length - 1]
+        : { id: 'none', name: '独自渡劫', rounds: 0, cost: 0 };
+    },
+
+    makeTribulation(nextRealm, aidRounds) {
+      const p = XG.State.Calc.playerStats();
+      const refR = Math.max(0, nextRealm - 0.15);
+      const plan = Combat.tribPlan(nextRealm, aidRounds);
+      const killRounds = plan.killRounds;
+      const surviveRounds = plan.surviveRounds;
       const def = p.def * 0.55;
       const playerDamage = Combat.offenseBudget(p, { def, dodge: 0, crit: 0, critDmg: 0, spd: 1 }, killRounds);
       const hp = Math.max(1, playerDamage * killRounds);

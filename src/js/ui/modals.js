@@ -270,18 +270,51 @@
       box.querySelector('#m-discard').onclick = onDiscard;
     },
 
-    /* ══════ 天劫确认 ══════ */
+    /* ══════ 天劫确认 + 渡劫准备 ══════
+       天劫的难度只由「余量」决定（见 Combat.tribMargin）：
+       余量 = 你能撑的回合数 − 击破它所需的回合数。
+       这里把回合预算直接摊开给玩家看，并允许投入灵石把余量补回来。 */
     askTribulation() {
-      const s = XG.State.s, C = XG.State.Calc;
-       const p = UI.playerStats();
-      const e = XG.Combat.makeTribulation(s.realm + 1);
-      const r = C.power(p) / Math.max(1, C.power(e));
+      const s = XG.State.s, C = XG.State.Calc, CB = XG.Combat;
+      const nextRealm = s.realm + 1;
+      const tiers = CB.tribAidTiers();
+      let picked = tiers.length ? tiers[0].id : 'none';
+
+      const aidBtns = tiers.map(t => {
+        const afford = t.cost <= s.res.stone;
+        const costTxt = t.cost > 0 ? `　<small>${U.fmt(t.cost)} 灵石</small>` : '';
+        return `<button class="btn sm" type="button" data-aid="${t.id}" aria-pressed="false"${afford ? '' : ' disabled'}>`
+          + `${t.name}${costTxt}</button>`;
+      }).join('');
+
       const box = Modals.open(`
         <div class="modal-title">引动天劫</div>
-        <div class="modal-sub">${XG.R.name(s.realm, s.layer)} → ${XG.REALMS[s.realm + 1].name}境</div>
+        <div class="modal-sub">${XG.R.name(s.realm, s.layer)} → ${XG.REALMS[nextRealm].name}境</div>
         <div class="modal-body">
-          跨越大境界必受天劫。此战为真实战斗，若败北将散失部分灵气，但道基不损，可再战。<br><br>
-          <div style="display:flex;gap:14px;justify-content:center;margin-top:10px">
+          跨越大境界必受天劫。此战为真实战斗，若败北将散失部分灵气，但道基不损，可再战。
+          <div class="hint" style="margin-top:6px">境界越高雷劫越紧 —— 后期余量不足便必败，需提前布阵。</div>
+          <div class="hint" style="margin-top:14px">渡劫准备</div>
+          <div class="btn-row" id="trib-aid" style="margin-top:7px">${aidBtns}</div>
+          <div id="trib-assess" style="margin-top:14px"></div>
+        </div>
+        <div class="modal-actions">
+           <button class="btn" id="m-cancel" type="button">再作准备</button>
+           <button class="btn primary" id="m-ok" type="button">迎雷而上</button>
+        </div>`, { noDismiss: false });
+
+      const assessBox = box.querySelector('#trib-assess');
+      const refresh = () => {
+        const tier = tiers.find(t => t.id === picked) || { rounds: 0 };
+        const plan = CB.tribPlan(nextRealm, tier.rounds);
+        const p = UI.playerStats();
+        const e = CB.makeTribulation(nextRealm, tier.rounds);
+        const m = plan.margin;
+        const tone = m >= 3 ? ['#7ee08a', '天道垂青，胜算在握。']
+          : m >= 2 ? ['#e9c46a', '需全力应对，稳中求胜。']
+            : m >= 1.2 ? ['#ffb454', '凶险异常 —— 建议布阵后再战。']
+              : ['#ff9aa8', '九死一生 —— 务必倾力准备。'];
+        UI.setHTML(assessBox, `
+          <div style="display:flex;gap:14px;justify-content:center">
             <div style="text-align:center">
               <div class="hint">我方战力</div>
               <div style="font-family:var(--font-serif);font-size:20px;color:var(--jade-2)">${U.fmt(C.power(p))}</div>
@@ -291,16 +324,28 @@
               <div style="font-family:var(--font-serif);font-size:20px;color:#ff9aa8">${U.fmt(C.power(e))}</div>
             </div>
           </div>
-          <div class="hint" style="text-align:center;margin-top:12px">
-            ${r > 1.5 ? '你的实力已足以碾压此劫。' : r > 1.1 ? '天道垂青，胜算在握。' : r > 0.9 ? '势均力敌，需看机缘。' : '实力尚有不足，凶险异常。'}
-          </div>
-        </div>
-        <div class="modal-actions">
-           <button class="btn" id="m-cancel" type="button">再作准备</button>
-           <button class="btn primary" id="m-ok" type="button">迎雷而上</button>
-        </div>`, { noDismiss: false });
+          <div class="hint" style="text-align:center;margin-top:12px;color:${tone[0]}">${tone[1]}</div>
+          <div class="hint" style="text-align:center;margin-top:5px">
+            你可撑约 <b>${plan.surviveRounds.toFixed(1)}</b> 回合，需 <b>${plan.killRounds.toFixed(1)}</b> 回合击破
+            —— 余量 <b style="color:${tone[0]}">${m.toFixed(1)}</b> 回合
+          </div>`);
+        box.querySelectorAll('[data-aid]').forEach(b => {
+          const on = b.dataset.aid === picked;
+          b.classList.toggle('primary', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+      };
+
+      box.querySelector('#trib-aid').onclick = ev => {
+        const b = ev.target.closest('[data-aid]');
+        if (!b || b.disabled) return;
+        picked = b.dataset.aid;
+        refresh();
+      };
+      refresh();
+
       box.querySelector('#m-cancel').onclick = () => Modals.close();
-      box.querySelector('#m-ok').onclick = () => { Modals.close(); XG.Cult.startTribulation(); };
+      box.querySelector('#m-ok').onclick = () => { Modals.close(); XG.Cult.startTribulation(picked); };
     },
 
     /* ══════ 奇遇 ══════ */

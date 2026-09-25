@@ -31,7 +31,7 @@
       const s = XG.State.s;
       if (this._autoBreakCooldown > 0 || R.isMax(s.realm, s.layer) || XG.Combat.active || XG.Combat.last) return false;
       if (R.needTribulation(s.realm, s.layer)) {
-        const started = this.startTribulation();
+        const started = this.startTribulation('auto');
         if (!started) this._autoBreakCooldown = this.AUTO_BREAK_COOLDOWN;
         return !!started;
       }
@@ -234,13 +234,25 @@
     },
 
     /* ══════ 天劫 ══════ */
-    startTribulation() {
+    startTribulation(aidId) {
       const s = XG.State.s, Calc = XG.State.Calc;
       if (!R.needTribulation(s.realm, s.layer)) return false;
       if (s.spirit < Calc.need()) return false;
 
+      /* 渡劫准备：投入灵石布阵，换取本次渡劫的额外「余量」。
+         'auto' 用于挂机 —— 在付得起的前提下自动挑最高档，
+         否则后期天劫打不过会把挂机永久卡在境界门口。 */
+      const tier = aidId === 'auto'
+        ? XG.Combat.bestAffordableTribAid()
+        : (XG.Combat.tribAidTiers().find(t => t.id === aidId)
+          || { id: 'none', name: '独自渡劫', rounds: 0, cost: 0 });
+      if (tier.cost > 0) {
+        if (!XG.State.Res.spendStone(tier.cost)) return false;
+        XG.State.addLog(`【渡劫准备】${tier.name}，耗灵石 ${U.fmt(tier.cost)}，余量 +${tier.rounds.toFixed(1)} 回合。`, 'gain');
+      }
+
       const nextRealm = s.realm + 1;
-      const enemy = XG.Combat.makeTribulation(nextRealm);
+      const enemy = XG.Combat.makeTribulation(nextRealm, tier.rounds);
       const p = Calc.playerStats();
       return XG.Combat.startBattle(p, {
         kind: 'tribulation',

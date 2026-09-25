@@ -697,6 +697,63 @@ const uiRandom = () => {
       `「首次飞升」未紧随「大乘无量」（大乘 idx=${iRealm}，飞升 idx=${iAsc}）`);
   }
 
+  /* ── 7.8 回归：天劫必须是真实战斗，且「渡劫准备」是有意义的决策 ── */
+  {
+    const CB = XG.Combat;
+    // 余量必须随境界收窄。旧版两边同步增长，余量恒为 4 回合 —— 任何境界必胜。
+    const m1 = CB.tribMargin(1, 0);
+    const m12 = CB.tribMargin(12, 0);
+    ok(m12 < m1, `天劫余量未随境界收窄（练气 ${m1} vs 大罗 ${m12}）`);
+    ok(m1 - m12 >= 3, `余量收窄幅度过小（${m1} → ${m12}），天劫仍近乎必胜`);
+    ok(m12 < 0, `满级天劫余量仍为正（${m12}），不布阵也能稳赢`);
+
+    // tribPlan 必须与敌人生成同源，避免两处各算各的
+    const plan = CB.tribPlan(12, 0);
+    ok(Math.abs(plan.surviveRounds - (plan.killRounds + plan.margin)) < 1e-6,
+      'tribPlan 内部不自洽');
+    ok(plan.surviveRounds >= 1, 'tribPlan 的生存回合数落到 0 以下');
+
+    // 渡劫准备：档位、花费、以及对敌人的实际影响
+    const tiers = CB.tribAidTiers();
+    ok(tiers.length >= 3, '渡劫准备档位不足');
+    ok(tiers[0].cost === 0, '「独自渡劫」不应收费');
+    ok(tiers[tiers.length - 1].cost > 0, '付费档位花费为 0');
+    const bestTier = tiers[tiers.length - 1];
+    ok(CB.tribMargin(12, bestTier.rounds) > m12, '布阵未提升余量');
+
+    // 布阵必须真的削弱天劫化身（用严格小于，否则「布阵无效」也会蒙混过关）
+    const e0 = CB.makeTribulation(12, 0);
+    const e1 = CB.makeTribulation(12, bestTier.rounds);
+    ok(e1.atk < e0.atk,
+      `布阵之后敌方攻击未降低（${e0.atk.toFixed(1)} → ${e1.atk.toFixed(1)}），渡劫准备没有实际效果`);
+
+    // 自动模式必须挑「付得起的最高档」，否则挂机会被天劫永久卡住
+    const stoneBackup = XG.State.s.res.stone;
+    XG.State.s.res.stone = 0;
+    ok(CB.bestAffordableTribAid().cost === 0, '没有灵石时仍选了付费档位');
+    XG.State.s.res.stone = 1e15;
+    ok(CB.bestAffordableTribAid().cost === bestTier.cost, '灵石充足时未挑最高档');
+    XG.State.s.res.stone = stoneBackup;
+
+    // 渡劫确认弹窗：必须能列出准备档位，且切换档位会实时更新评估
+    const st = XG.State.s;
+    const keep = { realm: st.realm, layer: st.layer, spirit: st.spirit, stone: st.res.stone };
+    st.realm = 6; st.layer = 9;
+    st.spirit = XG.State.Calc.need();
+    st.res.stone = 1e15;
+    XG.Modals.askTribulation();
+    await wait(100);
+    const aidBtns = doc.querySelectorAll('#trib-aid [data-aid]');
+    ok(aidBtns.length === tiers.length, `渡劫弹窗的准备档位数量不符（${aidBtns.length} ≠ ${tiers.length}）`);
+    const assessEl = doc.querySelector('#trib-assess');
+    ok(!!assessEl, '渡劫弹窗缺少实力评估');
+    const beforeTxt = assessEl ? assessEl.textContent : '';
+    if (aidBtns.length > 1) { aidBtns[aidBtns.length - 1].click(); await wait(80); }
+    ok(assessEl && assessEl.textContent !== beforeTxt, '切换准备档位后评估没有更新');
+    XG.Modals.close();
+    st.realm = keep.realm; st.layer = keep.layer; st.spirit = keep.spirit; st.res.stone = keep.stone;
+  }
+
   /* ── 8. 重置存档（回归：beforeunload 不得把进度写回） ── */
   XG.MT.show('cultivate');
   // 重置会把状态下零，故在此先把本局战果留存下来供最终断言使用

@@ -86,7 +86,27 @@ console.log(`境界 ${XG.REALMS.length} | 功法 ${XG.ARTS.length} | 建筑 ${XG
 
 /* ── 运行环境装配 ── */
 if (process.env.TOWER_GROWTH) XG.Combat.TOWER_GROWTH = parseFloat(process.env.TOWER_GROWTH);
+/* 天劫难度是单个旋钮（余量），这里开放出来便于扫描调参 */
+for (const k of ['TRIB_MARGIN_BASE', 'TRIB_MARGIN_DECAY', 'TRIB_MIN_MARGIN']) {
+  if (process.env[k]) XG.CONFIG[k] = parseFloat(process.env[k]);
+}
+/* 关掉渡劫准备，用于单独观测「不布阵」时的真实胜率 */
+if (process.env.TRIB_NO_AID === '1') {
+  XG.CONFIG.TRIB_AID_TIERS = XG.CONFIG.TRIB_AID_TIERS.map(t => ({
+    id: t.id, name: t.name, rounds: 0, stoneSec: 0,
+  }));
+}
 XG.Combat.autoBossBattle = true;
+/* 统计挂机模式下的渡劫准备档位选择，用于确认「布阵」这条路径真的会被走 */
+const aidStat = {};
+{
+  const orig = XG.Combat.bestAffordableTribAid.bind(XG.Combat);
+  XG.Combat.bestAffordableTribAid = function () {
+    const t = orig();
+    aidStat[t && t.id || 'none'] = (aidStat[t && t.id || 'none'] || 0) + 1;
+    return t;
+  };
+}
 const closeBattleOnEnd = () => { XG.Combat.closeResult(); };
 XG.Bus.on('battle:end', closeBattleOnEnd);
 XG.Bus.on('event:show', d => {
@@ -105,7 +125,7 @@ console.error = (...a) => { errors.push(a.join(' ')); origErr('[捕获]', ...a);
 
 const dbg = { tribStart: 0, tribWin: 0, tribLose: 0, towerWin: 0, towerLose: 0, ascends: 0 };
 const _st = XG.Cult.startTribulation.bind(XG.Cult);
-XG.Cult.startTribulation = function () { const r = _st(); if (r) dbg.tribStart++; return r; };
+XG.Cult.startTribulation = function (aidId) { const r = _st(aidId); if (r) dbg.tribStart++; return r; };
 XG.Bus.on('tribulation:win', () => dbg.tribWin++);
 XG.Bus.on('tribulation:lose', () => dbg.tribLose++);
 XG.Bus.on('tower:win', () => dbg.towerWin++);
@@ -340,6 +360,10 @@ console.log(`功法            : ${Object.keys(s.arts).length} / ${XG.ARTS.lengt
 console.log(`灵宠            : ${s.pets.owned.length} 只（出战 ${s.pets.active.length}）`);
 console.log(`击杀/突破/渡劫   : ${s.stats.kills} / ${s.stats.breakthroughs} / ${s.stats.tribulations}`);
 console.log(`天劫 起/胜/负    : ${dbg.tribStart} / ${dbg.tribWin} / ${dbg.tribLose}`);
+{
+  const aids = Object.keys(aidStat).map(k => k + '×' + aidStat[k]).join('  ');
+  console.log(`渡劫准备档位     : ${aids || '未触发'}`);
+}
 console.log(`洞天总等级       : ${Object.values(s.buildings).reduce((a, b) => a + b, 0)}`);
 console.log(`装备            : ${XG.SLOTS.map(sl => (s.equip[sl.id] ? s.equip[sl.id].name : '空')).join(' / ')}`);
 console.log(`奇遇次数         : ${s.stats.events}`);
@@ -375,6 +399,13 @@ ok(tAscend === undefined || tAscend <= 3 * 3600,
 if (tMax !== undefined) {
   ok(tMax >= 45 * 60, `满级（大罗）仅用 ${U.time(tMax)}，长线内容不足（期望 ≥45 分钟）`);
 }
+/* 天劫不能再退化成「形同虚设」，但也不允许难到让挂机卡死。
+   自动模式会自动布阵，因此失败率应保持在一个很低的水位。 */
+ok(dbg.tribStart > 0, '整局未发生天劫（跨大境界的试炼缺失）');
+ok(dbg.tribStart >= 8, `天劫仅 ${dbg.tribStart} 次，跨境界的试炼形同虚设`);
+ok(dbg.tribLose <= Math.max(1, Math.floor(dbg.tribStart * 0.25)),
+  `渡劫失败 ${dbg.tribLose}/${dbg.tribStart} 次 —— 自动布阵下仍失败过多，挂机会被卡住`);
+
 ok(towerMax >= 25, `通天塔上限过浅（${towerMax} 层），后期内容不足`);
 ok(towerMax <= 200, `通天塔上限过深（${towerMax} 层），长期缺乏挑战`);
 ok(C.spiritRate() > 0 && isFinite(C.spiritRate()), '灵气速率为正且有限');
