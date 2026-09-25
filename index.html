@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>仙途 · 挂机修仙录</title>
+<link rel="stylesheet" href="src/css/main.css" />
+</head>
+<body>
+
+<canvas id="bg-canvas" aria-hidden="true"></canvas>
+<div class="vignette" aria-hidden="true"></div>
+
+<!-- ══════════════ 顶栏 ══════════════ -->
+<header id="topbar">
+  <div class="tb-left">
+    <div class="logo">
+      <span class="logo-mark">仙</span>
+      <div class="logo-text">
+        <b>仙途</b>
+        <small>挂机修仙录</small>
+      </div>
+    </div>
+    <button class="realm-badge" id="realm-badge" type="button" aria-label="查看当前境界与修行">
+      <span class="realm-ring" aria-hidden="true"></span>
+      <div class="realm-info">
+        <b id="realm-name">练气一层</b>
+        <small id="realm-sub">凡人蜕凡</small>
+      </div>
+    </button>
+  </div>
+
+  <div class="tb-center">
+    <div class="cult-bar-wrap">
+      <div class="cult-bar-top">
+        <span class="cult-label">灵气</span>
+        <span class="cult-num" id="cult-num">0 / 10</span>
+        <span class="cult-rate" id="cult-rate">+1.0/秒</span>
+      </div>
+       <div class="cult-bar" id="cult-progress" role="progressbar" aria-label="灵气进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="cult-fill" id="cult-fill"></div><div class="cult-glow" id="cult-glow"></div></div>
+      <div class="cult-eta" id="cult-eta">预计突破 00:10</div>
+    </div>
+  </div>
+
+  <div class="tb-right">
+    <div class="omen-chip" id="omen-chip" title="天象：周期性降临的天地异象">
+      <span class="omen-ico" id="omen-ico">—</span>
+      <span class="omen-txt" id="omen-txt">天象未起</span>
+      <span class="omen-time" id="omen-time"></span>
+    </div>
+    <button class="res" id="res-stone" type="button" aria-label="灵石，前往洞天" title="灵石：洞天、锻炉与功法的通用货币，来自秘境与妖兽">
+      <span class="res-ico" aria-hidden="true">◈</span><span class="res-val" id="val-stone">0</span>
+    </button>
+    <button class="res" id="res-herb" type="button" aria-label="灵草，前往丹道" title="灵草：炼丹的原材料，来自灵田与秘境">
+      <span class="res-ico" aria-hidden="true">❦</span><span class="res-val" id="val-herb">0</span>
+    </button>
+    <button class="res" id="res-jade" type="button" aria-label="仙玉，前往寻宝阁" title="仙玉：稀有货币，用于寻宝阁与秘宝">
+      <span class="res-ico" aria-hidden="true">✦</span><span class="res-val" id="val-jade">0</span>
+    </button>
+    <button class="icon-btn mobile-log-btn" id="btn-log" type="button" aria-label="打开天机录" aria-controls="logside" title="打开天机录" aria-expanded="false">☷</button>
+    <button class="icon-btn" id="btn-settings" type="button" aria-label="设置" title="设置">⚙</button>
+  </div>
+</header>
+
+<!-- ══════════════ 主体 ══════════════ -->
+<main id="layout">
+
+  <!-- 左侧导航 -->
+  <nav id="sidebar">
+    <div class="nav-group">修行</div>
+    <button type="button" class="nav-item active" data-panel="cultivate" aria-current="page">
+      <span class="nav-ico">☯</span><span class="nav-txt">修炼</span>
+      <em class="nav-dot" id="dot-cultivate"></em>
+    </button>
+    <button type="button" class="nav-item" data-panel="quest">
+      <span class="nav-ico">🧭</span><span class="nav-txt">道途</span>
+      <em class="nav-dot" id="dot-quest"></em>
+    </button>
+
+    <div class="nav-group">成长</div>
+    <button type="button" class="nav-item" data-panel="cave">
+      <span class="nav-ico">⛰</span><span class="nav-txt">洞天</span>
+      <em class="nav-dot" id="dot-cave"></em>
+    </button>
+    <button type="button" class="nav-item" data-panel="arts">
+      <span class="nav-ico">📖</span><span class="nav-txt">功法</span>
+      <em class="nav-dot" id="dot-arts"></em>
+    </button>
+    <button type="button" class="nav-item" data-panel="alchemy">
+      <span class="nav-ico">⚗</span><span class="nav-txt">丹道</span>
+      <em class="nav-dot" id="dot-alchemy"></em>
+    </button>
+    <button type="button" class="nav-item" data-panel="forge">
+      <span class="nav-ico">🔨</span><span class="nav-txt">锻炉</span>
+      <em class="nav-dot" id="dot-forge"></em>
+    </button>
+    <button type="button" class="nav-item" data-panel="gacha">
+      <span class="nav-ico">🎴</span><span class="nav-txt">寻宝</span>
+      <em class="nav-dot" id="dot-gacha"></em>
+    </button>
+    <button type="button" class="nav-item" data-panel="pets">
+      <span class="nav-ico">🐾</span><span class="nav-txt">灵宠</span>
+      <em class="nav-dot" id="dot-pets"></em>
+    </button>
+
+    <div class="nav-group">征战</div>
+    <button type="button" class="nav-item" data-panel="explore">
+      <span class="nav-ico">⚔</span><span class="nav-txt">秘境</span>
+      <em class="nav-dot" id="dot-explore"></em>
+    </button>
+    <button type="button" class="nav-item" data-panel="tower">
+      <span class="nav-ico">🗼</span><span class="nav-txt">通天塔</span>
+      <em class="nav-dot" id="dot-tower"></em>
+    </button>
+
+    <div class="nav-group">归藏</div>
+    <button type="button" class="nav-item" data-panel="bag">
+      <span class="nav-ico">🎒</span><span class="nav-txt">储物</span>
+      <em class="nav-dot" id="dot-bag"></em>
+    </button>
+    <button type="button" class="nav-item" data-panel="achievement">
+      <span class="nav-ico">🏆</span><span class="nav-txt">道果</span>
+      <em class="nav-dot" id="dot-achievement"></em>
+    </button>
+    <button type="button" class="nav-item" data-panel="ascend">
+      <span class="nav-ico">🌀</span><span class="nav-txt">飞升</span>
+      <em class="nav-dot" id="dot-ascend"></em>
+    </button>
+  </nav>
+
+  <!-- 主内容 -->
+  <section id="content">
+    <div class="panel-page active" id="page-cultivate"></div>
+    <div class="panel-page" id="page-quest"></div>
+    <div class="panel-page" id="page-cave"></div>
+    <div class="panel-page" id="page-arts"></div>
+    <div class="panel-page" id="page-alchemy"></div>
+    <div class="panel-page" id="page-forge"></div>
+    <div class="panel-page" id="page-gacha"></div>
+    <div class="panel-page" id="page-pets"></div>
+    <div class="panel-page" id="page-bag"></div>
+    <div class="panel-page" id="page-explore"></div>
+    <div class="panel-page" id="page-tower"></div>
+    <div class="panel-page" id="page-achievement"></div>
+    <div class="panel-page" id="page-ascend"></div>
+  </section>
+
+  <!-- 右侧日志 -->
+  <aside id="logside" aria-label="天机录">
+    <div class="log-head">
+      <div class="log-head-top">
+        <span>天机录</span>
+        <button class="log-fold" id="btn-fold-log" type="button" aria-label="收起天机录" aria-expanded="true" title="收起日志栏，让主界面更宽敞">收起 ▸</button>
+        <button class="log-fold mobile-log-close" id="btn-log-close" type="button" aria-label="关闭天机录">关闭</button>
+      </div>
+      <div class="log-tabs" role="tablist" aria-label="天机录筛选">
+        <button class="log-tab active" type="button" role="tab" aria-selected="true" data-filter="all">全部</button>
+        <button class="log-tab" type="button" role="tab" aria-selected="false" data-filter="battle">战斗</button>
+        <button class="log-tab" type="button" role="tab" aria-selected="false" data-filter="gain">收获</button>
+        <button class="log-tab" type="button" role="tab" aria-selected="false" data-filter="event">机缘</button>
+      </div>
+    </div>
+    <div class="log-body" id="log-body" role="log" aria-live="polite" aria-relevant="additions text"></div>
+    <div class="log-foot">
+      <button class="mini-btn" id="btn-clear-log" type="button" aria-label="清空天机录">清空记录</button>
+    </div>
+  </aside>
+</main>
+
+<!-- ══════════════ 底部状态条 ══════════════ -->
+<footer id="bottombar">
+  <!-- 道途入口：替代原先常驻浮动的引导条 -->
+   <button class="quest-chip" id="quest-chip" type="button" aria-label="查看当前道途目标" title="查看当前道途目标">
+    <span class="qc-ico" id="qc-ico">🧭</span>
+    <span class="qc-txt" id="qc-txt">道途</span>
+    <em class="qc-step" id="qc-step"></em>
+  </button>
+  <div class="bb-sep"></div>
+
+  <div class="bb-group" id="bb-stats"></div>
+
+  <div class="bb-group right">
+     <button class="toggle-btn" id="toggle-auto-break" type="button" aria-pressed="false" title="灵气满后自动突破">
+      <span class="tg-ico">⬆</span><span class="tg-label">自动突破</span><em class="tg-state">关</em>
+    </button>
+     <button class="toggle-btn" id="toggle-auto-pill" type="button" aria-pressed="false" title="灵气满时自动服用背包中的丹药">
+      <span class="tg-ico">⚗</span><span class="tg-label">自动丹药</span><em class="tg-state">关</em>
+    </button>
+     <button class="toggle-btn" id="toggle-explore" type="button" aria-pressed="false" title="自动在秘境中探索">
+      <span class="tg-ico">⚔</span><span class="tg-label">自动秘境</span><em class="tg-state">关</em>
+    </button>
+    <div class="bb-sep"></div>
+    <div class="bb-fps" id="bb-time">第 1 天</div>
+  </div>
+</footer>
+
+<!-- ══════════════ 弹窗层 ══════════════ -->
+<div id="modal-layer" class="hidden" aria-hidden="true">
+  <div class="modal-mask" id="modal-mask" aria-hidden="true"></div>
+  <div class="modal-box" id="modal-box" role="dialog" aria-modal="true" tabindex="-1"></div>
+</div>
+
+<!-- ══════════════ 飘字层 ══════════════ -->
+<div id="float-layer" aria-hidden="true"></div>
+
+<!-- ══════════════ 掉落 / 抽卡动画层 ══════════════ -->
+<div id="loot-layer" aria-live="polite" aria-relevant="additions"></div>
+<div id="ui-status" class="sr-only" role="status" aria-live="polite"></div>
+
+<!-- ══════════════ 脚本 ══════════════ -->
+<script src="src/js/core/utils.js"></script>
+<script src="src/js/data/realms.js"></script>
+<script src="src/js/data/content.js"></script>
+<script src="src/js/data/content2.js"></script>
+<script src="src/js/core/state.js"></script>
+<script src="src/js/systems/cultivation.js"></script>
+<script src="src/js/systems/combat.js"></script>
+<script src="src/js/systems/economy.js"></script>
+<script src="src/js/systems/pets.js"></script>
+<script src="src/js/systems/meta.js"></script>
+<script src="src/js/systems/forge.js"></script>
+<script src="src/js/systems/gacha.js"></script>
+<script src="src/js/systems/quest.js"></script>
+<script src="src/js/ui/background.js"></script>
+<script src="src/js/ui/render.js"></script>
+<script src="src/js/ui/panels.js"></script>
+<script src="src/js/ui/panels2.js"></script>
+<script src="src/js/ui/panels3.js"></script>
+<script src="src/js/ui/modals.js"></script>
+<script src="src/js/game.js"></script>
+</body>
+</html>

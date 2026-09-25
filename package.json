@@ -1,0 +1,21 @@
+{
+  "name": "xiantu-idle-cultivation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "仙途 · 挂机修仙录 —— 纯前端（零依赖）浏览器挂机修仙游戏",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node tests/css-audit.js && node tests/smoke-test.js 2 && node tests/ui-test.js",
+    "test:logic": "node tests/smoke-test.js 2",
+    "test:ui": "node tests/ui-test.js",
+    "test:css": "node tests/css-audit.js",
+    "test:long": "node tests/smoke-test.js 8"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

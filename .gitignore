@@ -1,0 +1,13 @@
+# ── 依赖 ──
+node_modules/
+package-lock.json
+
+# ── 系统文件 ──
+*.log
+.DS_Store
+Thumbs.db
+
+# ── 工具 / 编辑器产生的状态（不属于游戏源码，仅本地保留） ──
+.playwright-cli/
+.workbuddy/
+.codebuddy/
