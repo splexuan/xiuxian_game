@@ -31,7 +31,7 @@
 
     /* ── 攻伐 ── */
     { id: 'a_lieyan', type: 'atk', name: '烈焰掌', q: 0, eff: 0.07, costBase: 50, desc: '掌心凝火，掌出如焚。', lore: '烈火燎原，寸草不生。' },
-    { id: 'a_jin Gang', type: 'atk', name: '金刚伏魔拳', q: 1, eff: 0.10, costBase: 300, desc: '拳意刚猛，专破妖邪。', lore: '金刚怒目，降伏四魔。' },
+    { id: 'a_jingang', type: 'atk', name: '金刚伏魔拳', q: 1, eff: 0.10, costBase: 300, desc: '拳意刚猛，专破妖邪。', lore: '金刚怒目，降伏四魔。' },
     { id: 'a_qinglian', type: 'atk', name: '青莲剑歌', q: 2, eff: 0.15, costBase: 3000, desc: '剑如青莲绽放，一花一世界。', lore: '十步杀一人，千里不留行。' },
     { id: 'a_zhuxian', type: 'atk', name: '诛仙剑意', q: 3, eff: 0.21, costBase: 30000, desc: '剑意一出，仙神辟易。', lore: '剑来！' },
     { id: 'a_fentian', type: 'atk', name: '焚天战决', q: 4, eff: 0.30, costBase: 3e5, desc: '战意焚天，战力倍增。', lore: '一怒焚天，血流漂橹。' },

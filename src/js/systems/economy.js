@@ -376,8 +376,6 @@
     },
   };
 
-  function Combat_score(e) { return e.score || 0; }
-
   XG.Equip = Equip;
   XG.Economy = Economy;
   XG.BAG_LIMIT = BAG_LIMIT;

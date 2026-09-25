@@ -195,21 +195,6 @@
       };
     },
 
-    tribulationEstimate(nextRealm) {
-      const p = XG.State.Calc.playerStats();
-      const enemy = Combat.makeTribulation(nextRealm);
-      const rounds = Math.max(1, (XG.CONFIG.TRIB_KILL_ROUNDS + nextRealm * XG.CONFIG.TRIB_ROUNDS_PER_REALM) * (XG.CONFIG.TRIB_BASE_POWER || 1));
-      const playerDamage = Combat.offenseBudget(p, enemy, rounds);
-      const incoming = Combat.expectedDamage(Combat.mkUnit(enemy, false), Combat.mkUnit(p, true));
-      const roundsToWin = playerDamage > 0 ? enemy.hp / playerDamage : Infinity;
-      const roundsToSurvive = incoming > 0 ? p.maxHp / incoming : Infinity;
-      const balance = Math.min(roundsToWin / rounds, rounds / Math.max(1, roundsToSurvive));
-      return {
-        enemy, playerDamage, incoming, roundsToWin, roundsToSurvive, balance,
-        tone: balance >= 1.35 ? 'strong' : balance >= 1 ? 'even' : 'danger',
-      };
-    },
-
     /* ══════ 通天塔 ══════
        塔层难度按指数增长（玩家靠装备/功法/道果实现的成长同样是
        指数级），因此塔能长期充当「验算修行成果」的标尺。 */
@@ -312,7 +297,13 @@
 
     MAX_COMBO: 10,
     COMBO_STEP: 0.03,      // 每层连击 +3% 伤害
-    ENERGY_PER_ROUND: 22,  // 每回合回复灵力
+    ENERGY_PER_ROUND: 22,  // 玩家每回合回复灵力
+    ENEMY_ENERGY_PER_ROUND: 18,
+    /* 速度对灵力回复的加成区间（按双方速度比映射）。
+       速度的实际收益 = 先手 + 灵力回复更快；这里卡住上下限，
+       既让堆速度有平滑收益，又不会产生无限收益。 */
+    SPD_ENERGY_MIN: 0.6,
+    SPD_ENERGY_MAX: 1.8,
     MAX_LOG: 260,
 
     /* 生成战斗单位（战斗内使用的可变副本） */
@@ -401,7 +392,9 @@
         attacker.buffs = attacker.buffs.filter(buff => buff.rounds > 0);
         defender.buffs.forEach(buff => buff.rounds--);
         defender.buffs = defender.buffs.filter(buff => buff.rounds > 0);
-        attacker.energy = Math.min(attacker.maxEnergy, attacker.energy + Combat.ENERGY_PER_ROUND);
+        /* 与 runRound 保持一致的灵力回复模型，否则天劫预算会与实际战斗脱节 */
+        attacker.energy = Math.min(attacker.maxEnergy,
+          attacker.energy + Combat.ENERGY_PER_ROUND * Combat.spdEnergyMult(attacker, defender));
         if (round <= 2) {
           const support = attacker.skills.map(id => XG.idx.skill[id]).find(sk => sk && (sk.role === 'support' || sk.role === 'control') && attacker.energy >= sk.cost && !attacker.cd[sk.id]);
           if (support) {
@@ -595,13 +588,24 @@
 
     isAuto(b) { return b.auto !== false; },
 
+    /* 速度比 → 灵力回复倍率（有上下限，避免极端堆叠产生无限收益） */
+    spdEnergyMult(a, b) {
+      const sa = Math.max(1e-4, Number(a && a.spd) || 1);
+      const sb = Math.max(1e-4, Number(b && b.spd) || 1);
+      return U.clamp(sa / sb, Combat.SPD_ENERGY_MIN, Combat.SPD_ENERGY_MAX);
+    },
+
     runRound(b) {
       b.round++;
       Combat.tickBuffs(b.p, b, 'p');
       Combat.tickBuffs(b.e, b, 'e');
       if (b.p.hp <= 0 || b.e.hp <= 0) return;
-      b.p.energy = Math.min(b.p.maxEnergy, b.p.energy + Combat.ENERGY_PER_ROUND);
-      b.e.energy = Math.min(b.e.maxEnergy, b.e.energy + 18);
+      /* 灵力回复随双方速度比浮动：速度快的一侧出手更频。
+         这是速度除「先手」之外的第二个实际收益。 */
+      b.p.energy = Math.min(b.p.maxEnergy,
+        b.p.energy + Combat.ENERGY_PER_ROUND * Combat.spdEnergyMult(b.p, b.e));
+      b.e.energy = Math.min(b.e.maxEnergy,
+        b.e.energy + Combat.ENEMY_ENERGY_PER_ROUND * Combat.spdEnergyMult(b.e, b.p));
 
       /* 手动模式：若玩家有可施展的神通，则停下等待指令 */
       if (!Combat.isAuto(b) && b.pendingSkill === undefined && !b.waiting

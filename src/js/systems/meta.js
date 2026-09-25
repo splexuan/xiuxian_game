@@ -340,9 +340,10 @@
         level: XG.R.totalLevel(s.realm, s.layer),
         tower: s.tower.best,
         ach: Object.keys(s.achievements).length,
-        spiritMult: 1 + (s.prestige.earned + gain) * 0.07,
-        atkMult: 1 + (s.prestige.earned + gain) * 0.06,
-        hpMult: 1 + (s.prestige.earned + gain) * 0.06,
+        /* 与 Calc.mods() 保持同一公式（收益递减），否则预览与实际不符 */
+        spiritMult: XG.State.Calc.permRate(s.prestige.earned + gain, 0.07),
+        atkMult: XG.State.Calc.permRate(s.prestige.earned + gain, 0.06),
+        hpMult: XG.State.Calc.permRate(s.prestige.earned + gain, 0.06),
       };
     },
 

@@ -10,6 +10,12 @@
   const SAVE_KEY = 'xiantu_save_v1';
   const SAVE_VERSION = 1;
 
+  /* ══════ 历史存档兼容映射 ══════
+     旧版本「金刚伏魔拳」的 id 里误含空格（'a_jin Gang'），
+     会污染存档键名，也会出现在 HTML 的 data-art 属性里。
+     已修正为 'a_jingang'，读档时按此表做一次性改名。 */
+  const ART_ID_ALIAS = { 'a_jin Gang': 'a_jingang' };
+
   /* ══════ 默认存档 ══════ */
   function createState() {
     return {
@@ -429,10 +435,14 @@
       const ab = state.achBonus;
       const pr = state.prestige;
 
-      // 仙缘基础加成（累计仙缘点越多，全属性越高）
-      const prSpirit = 1 + pr.earned * 0.07;
-      const prAtk = 1 + pr.earned * 0.06;
-      const prHp = 1 + pr.earned * 0.06;
+      /* 仙缘基础加成（累计仙缘点越多，全属性越高）。
+         必须走收益递减，不能用线性：境界需求是固定的，
+         若加成随 earned 无限线性增长，转生若干次后单局时长会塌缩，
+         13 重境界的内容会被一路秒穿。
+         permRate = 1 + per * min(n,PERM_CAP)^0.72，天然收敛且有上限。 */
+      const prSpirit = Calc.permRate(pr.earned, 0.07);
+      const prAtk = Calc.permRate(pr.earned, 0.06);
+      const prHp = Calc.permRate(pr.earned, 0.06);
 
       const eqp = bm.equipPower;
 
@@ -537,7 +547,12 @@
     power(st) {
       const off = st.atk * (1 + st.crit * (1 + st.critDmg)) * (1 + st.lifesteal) * (1 + st.pen * 0.6);
       const def = st.hp * 0.55 + st.def * 1.4;
-      return (off + def) * (1 + st.dodge * 0.8) * (1 + (st.spd - 1) * 0.35);
+      /* 速度的实际收益只有两项：先手判定 + 灵力回复加成（后者上限 1.8 倍，见
+         Combat.SPD_ENERGY_MAX），因此这里必须同样封顶。
+         从前写的是 (1 + (spd-1)*0.35) 无上限，导致堆速度能把战力虚抬到
+         与实际战斗力完全脱节 —— 玩家看到战力高，打起来却没差别。 */
+      const spdFactor = 1 + U.clamp((Number(st.spd) || 1) - 1, 0, 0.8) * 0.25;
+      return (off + def) * (1 + st.dodge * 0.8) * spdFactor;
     },
 
     /* ════ 玩家战斗属性 ════ */
@@ -596,7 +611,7 @@
 
     /* 功法等级上限（藏经阁加成有上限，避免无限堆叠） */
     artMaxLv() {
-      return 18 + state.realm * 6 + Math.min(30, Calc.buildingMults().artLvBonus * 0.5) | 0;
+      return Math.floor(18 + state.realm * 6 + Math.min(30, Calc.buildingMults().artLvBonus * 0.5));
     },
 
     /* 功法升级消耗 */
@@ -868,9 +883,13 @@
       const artRaw = asObject(data.arts, 'arts');
       const artMax = 18 + merged.realm * 6 + Math.min(30, Math.floor((merged.buildings.b_library || 0) * 0.5));
       merged.arts = {};
-      for (const id of Object.keys(artRaw)) {
-        if (!hasOwn(XG.idx.art, id) || !isObject(artRaw[id])) continue;
-        merged.arts[id] = { lv: safeNumber(artRaw[id].lv, 1, 1, artMax, true) };
+      for (const rawId of Object.keys(artRaw)) {
+        const id = ART_ID_ALIAS[rawId] || rawId;
+        if (!hasOwn(XG.idx.art, id) || !isObject(artRaw[rawId])) continue;
+        const lv = safeNumber(artRaw[rawId].lv, 1, 1, artMax, true);
+        // 新旧 id 同时存在时取等级较高者，避免改名丢进度
+        const prev = merged.arts[id];
+        merged.arts[id] = { lv: prev ? Math.max(prev.lv, lv) : lv };
       }
       if (!merged.arts.a_yinqi) merged.arts.a_yinqi = { lv: 1 };
 

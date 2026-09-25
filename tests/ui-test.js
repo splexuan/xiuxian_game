@@ -587,6 +587,51 @@ const uiRandom = () => {
   ok(mkeys.length >= (XG.TALENTS || []).length,
     `存档迁移后天赋键只有 ${mkeys.length} 个（应为 ${(XG.TALENTS || []).length} 个）—— 0 级存档会退化成 {} 并污染乘区`);
 
+  /* ── 7.6 回归：数据审查发现的三处缺陷 ── */
+
+  // (a) 旧存档里功法 id 含空格（'a_jin Gang'）必须被迁移到 'a_jingang'，
+  //     否则会污染存档键名与 HTML 的 data-art 属性。
+  {
+    const migratedArts = XG.State.Save.migrate({ version: 1, arts: { 'a_jin Gang': { lv: 3 } } });
+    const arts = (migratedArts && migratedArts.arts) || {};
+    ok(arts.a_jingang && arts.a_jingang.lv === 3,
+      `含空格的旧功法 id 未迁移到 a_jingang（实际键：${Object.keys(arts).join(',')}）`);
+    ok(!arts['a_jin Gang'], '旧功法 id 仍残留在存档中');
+    ok(!XG.idx.art['a_jin Gang'], '功法表里仍存在含空格的 id');
+    ok(!!XG.idx.art.a_jingang, '功法表缺少 a_jingang');
+  }
+
+  // (b) 仙缘加成必须收敛。
+  //     境界需求是固定的，加成若随 earned 线性无上限，转生若干次后
+  //     单局时长会塌缩，13 重境界的内容被一路秒穿。
+  {
+    const C = XG.State.Calc;
+    const capped = C.permRate(C.PERM_CAP, 0.07);
+    ok(Math.abs(C.permRate(1e6, 0.07) - capped) < 1e-9, '仙缘加成未封顶');
+    ok(capped < 20, `仙缘加成上限过高（${capped.toFixed(1)}×），长线仍会塌缩`);
+    const backup = XG.State.s.prestige.earned;
+    XG.State.s.prestige.earned = 1e9;
+    const m = C.mods();
+    ok(Number.isFinite(m.spirit) && m.spirit < 1e9, '仙缘点极高时 mods() 未被约束');
+    const preview = XG.Prestige.preview();
+    ok(preview && Math.abs(preview.spiritMult - capped) < 1e-6,
+      '飞升预览的加成公式与实际 mods() 不一致');
+    XG.State.s.prestige.earned = backup;
+  }
+
+  // (c) 速度的实际收益有上限（先手 + 灵力回复），战力不得被速度虚抬。
+  {
+    const C = XG.State.Calc, CB = XG.Combat;
+    ok(CB.spdEnergyMult({ spd: 100 }, { spd: 1 }) === CB.SPD_ENERGY_MAX,
+      '速度比极高时灵力回复倍率未封顶');
+    ok(CB.spdEnergyMult({ spd: 0.01 }, { spd: 1 }) === CB.SPD_ENERGY_MIN,
+      '速度比极低时灵力回复倍率未设下限');
+    const base = { atk: 100, hp: 1000, def: 100, crit: 0.1, critDmg: 0.5, dodge: 0.05, lifesteal: 0, pen: 0, spd: 1 };
+    const fast = Object.assign({}, base, { spd: 1000 });
+    const ratio = C.power(fast) / C.power(base);
+    ok(ratio <= 1.25, `速度对战力加成未封顶（速度 1000 时放大 ${ratio.toFixed(2)}×）`);
+  }
+
   /* ── 8. 重置存档（回归：beforeunload 不得把进度写回） ── */
   XG.MT.show('cultivate');
   // 重置会把状态下零，故在此先把本局战果留存下来供最终断言使用
