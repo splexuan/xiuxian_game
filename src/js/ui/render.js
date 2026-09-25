@@ -220,7 +220,7 @@
         towerFloor: s.tower.floor,
         eggs: s.pets.eggs,
         petCount: s.pets.owned.length,
-        quest: s.quest.idx,
+        quest: s.quest.id,
         omen: copySnapshot(s.omen),
       };
       const p = MT.reconcileState;

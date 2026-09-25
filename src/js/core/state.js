@@ -16,6 +16,18 @@
      已修正为 'a_jingang'，读档时按此表做一次性改名。 */
   const ART_ID_ALIAS = { 'a_jin Gang': 'a_jingang' };
 
+  /* 道途任务链的**旧数组顺序**（2026-09 版之前）。
+     旧档的 quest.idx 是这份顺序里的下标，而现在指针改为任务 id，
+     所以读档时要用这张表把旧下标翻译回 id。
+     之所以要把顺序固化下来：同一次改动里「斩妖万头(q30)」已被移出任务链，
+     若直接用现在的数组去解释旧下标，卡在 q30 的玩家会莫名跳到别的任务。 */
+  const LEGACY_QUEST_ORDER = [
+    'q01', 'q02', 'q03', 'q04', 'q05', 'q06', 'q07', 'q08', 'q09',
+    'q10', 'q11', 'q12', 'q13', 'q14', 'q15', 'q16', 'q17', 'q18',
+    'q19', 'q20', 'q21', 'q22', 'q23', 'q24', 'q25', 'q26', 'q27',
+    'q28', 'q29', 'q30', 'q31', 'q32', 'q33', 'q34', 'q35', 'q36',
+  ];
+
   /* ══════ 默认存档 ══════ */
   function createState() {
     return {
@@ -52,8 +64,10 @@
       achievements: {},
       achBonus: { spirit: 0, atk: 0, hp: 0, stoneGain: 0 },
 
-      /* 道途任务链 */
-      quest: { idx: 0, claimed: {}, seen: {}, ready: {} },
+      /* 道途任务链。
+         指针存「任务 id」而不是数组下标 —— 后者一旦调整任务顺序就会错位，
+         让所有旧档指向错误的任务。 */
+      quest: { id: (XG.QUESTS[0] || {}).id || null, claimed: {}, seen: {}, ready: {} },
 
       /* 寻宝阁保底计数 */
       gacha: { pity: { art: 0, equip: 0, pet: 0, mat: 0 }, total: { art: 0, equip: 0, pet: 0, mat: 0 } },
@@ -1050,8 +1064,22 @@
         }
         return out;
       };
+      /* 任务指针解析：
+         优先用新格式的 id；旧档则把下标经 LEGACY_QUEST_ORDER 翻译成 id。
+         若翻译出的任务已被移除（如 q30「斩妖万头」），
+         就顺延到新链中同一位置的任务 —— 卡在 q30 的玩家会自然过渡到「首次飞升」。 */
+      let questId = XG.QUESTS.length ? XG.QUESTS[0].id : null;
+      if (typeof questRaw.id === 'string' && hasOwn(XG.idx.quest, questRaw.id)) {
+        questId = questRaw.id;
+      } else if (hasOwn(questRaw, 'idx')) {
+        const legacyIdx = safeNumber(questRaw.idx, 0, 0, LEGACY_QUEST_ORDER.length, true);
+        const legacyId = LEGACY_QUEST_ORDER[legacyIdx];
+        if (legacyId && hasOwn(XG.idx.quest, legacyId)) questId = legacyId;
+        else if (legacyIdx < XG.QUESTS.length) questId = XG.QUESTS[legacyIdx].id;
+        else questId = null;          // 旧档已完成全部任务
+      }
       merged.quest = {
-        idx: safeNumber(questRaw.idx, 0, 0, XG.QUESTS.length, true),
+        id: questId,
         claimed: questTimes(questRaw.claimed),
         seen: questTimes(questRaw.seen),
         ready: questTimes(questRaw.ready),

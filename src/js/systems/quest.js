@@ -15,20 +15,37 @@
     { n: 6, name: '轮回再世', icon: '🌀', desc: '斩断因果者，方可重走一次仙途。' },
   ];
 
+  /* 任务 id → 链中位置（惰性构建；任务表在运行期不变） */
+  let POS = null;
+  function posOf(id) {
+    if (!POS) {
+      POS = Object.create(null);
+      XG.QUESTS.forEach((q, i) => { POS[q.id] = i; });
+    }
+    return POS[id];
+  }
+
   const Quest = {
     CHAPTERS,
     list() { return XG.QUESTS; },
     chapter(n) { return CHAPTERS.find(c => c.n === n); },
 
-    /* 当前进行中的任务 */
+    /* 当前进行中的任务。指针存的是任务 id，故这里走索引表 O(1) 命中 */
     current() {
-      const s = XG.State.s;
-      return XG.QUESTS[s.quest.idx] || null;
+      const id = XG.State.s.quest.id;
+      return (id && XG.idx.quest[id]) || null;
     },
-    index() { return XG.State.s.quest.idx; },
+    /* 当前任务在链中的位置（等价于已完成数量）。
+       由 id 反查位置，因此增删或重排任务都不会让存档指针错位。 */
+    index() {
+      const id = XG.State.s.quest.id;
+      if (!id) return XG.QUESTS.length;
+      const i = posOf(id);
+      return i === undefined ? XG.QUESTS.length : i;
+    },
     total() { return XG.QUESTS.length; },
-    doneCount() { return Math.min(XG.State.s.quest.idx, XG.QUESTS.length); },
-    allDone() { return XG.State.s.quest.idx >= XG.QUESTS.length; },
+    doneCount() { return Math.min(Quest.index(), XG.QUESTS.length); },
+    allDone() { return Quest.index() >= XG.QUESTS.length; },
 
     /* 当前任务目标是否达成 */
     reached() {
@@ -39,9 +56,9 @@
 
     /* 某章节的完成进度 */
     chapterProgress(n) {
-      const s = XG.State.s;
+      const cur = Quest.index();
       const list = XG.QUESTS.filter(q => q.ch === n);
-      const done = list.filter(q => XG.QUESTS.indexOf(q) < s.quest.idx).length;
+      const done = list.filter(q => posOf(q.id) < cur).length;
       return { done, total: list.length };
     },
 
@@ -63,7 +80,9 @@
       const s = XG.State.s;
       const gain = Quest.applyReward(q.reward || {});
       s.quest.claimed[q.id] = Date.now();
-      s.quest.idx++;
+      /* 指针按任务 id 推进；走到末尾则置 null 表示全部完成 */
+      const nextDef = XG.QUESTS[posOf(q.id) + 1] || null;
+      s.quest.id = nextDef ? nextDef.id : null;
       s.stats.questsDone = (s.stats.questsDone || 0) + 1;
 
       XG.State.addLog(`【道途·${q.title}】达成！${gain.text}`, 'epic');

@@ -561,6 +561,7 @@
 
     { id: 'ac_slay100', name: '斩妖百头', icon: '⚔', desc: '击败 100 只妖兽', reward: { atk: 0.05 }, cond: s => s.stats.kills >= 100 },
     { id: 'ac_slay1k', name: '斩妖千头', icon: '🗡', desc: '击败 1000 只妖兽', reward: { atk: 0.10 }, cond: s => s.stats.kills >= 1000 },
+    { id: 'ac_slay10k', name: '斩妖万头', icon: '💀', desc: '击败 10000 只妖兽', reward: { atk: 0.20 }, cond: s => s.stats.kills >= 10000 },
     { id: 'ac_slay10k', name: '杀伐无双', icon: '💀', desc: '击败 10000 只妖兽', reward: { atk: 0.20 }, cond: s => s.stats.kills >= 10000 },
     { id: 'ac_boss10', name: '屠戮妖王', icon: '👑', desc: '击败 10 只妖王', reward: { atk: 0.08 }, cond: s => s.stats.bossKills >= 10 },
     { id: 'ac_tower10', name: '登塔十层', icon: '🗼', desc: '通天塔到达第 10 层', reward: { hp: 0.05 }, cond: s => s.tower.best >= 10 },

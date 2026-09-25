@@ -247,8 +247,10 @@
       tip: '强化消耗灵石，成功率随等级下降。', goal: (s) => (s.stats.enhances || 0) >= 20, reward: { jade: 90, free: 'all' } },
     { id: 'q29', ch: 5, title: '大乘无量', icon: '🔆', desc: '突破至【大乘境】，获得飞升资格。',
       tip: '', goal: (s) => s.realm >= 7, reward: { jade: 200, free: 'all' } },
-    { id: 'q30', ch: 5, title: '斩妖万头', icon: '💀', desc: '累计击败 10000 只妖兽。',
-      tip: '', goal: (s) => s.stats.kills >= 10000, reward: { jade: 150, free: 'atk' } },
+    /* 原 q30「斩妖万头」已移出任务链。
+       它要求累计击杀 10000 只妖兽（实测约 23 小时），却挡在「首次飞升」之前，
+       而任务链是严格线性的 —— 玩家会被卡在刷怪上，第六章的引导永远看不到。
+       现改为道果 ac_slay10k（与「斩妖百头 / 千头」同族），飞升不再被它阻塞。 */
 
     /* ── 第六章 · 轮回再世 ── */
     { id: 'q31', ch: 6, title: '斩断因果', icon: '🌀', desc: '完成第一次飞升转生。',

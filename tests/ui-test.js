@@ -268,14 +268,14 @@ const uiRandom = () => {
   ok(!!curQ, '道途无当前任务');
   // 强制达成第一个任务并领取
   XG.State.s.stats.meditates = 99;
-  XG.State.s.quest.idx = 0;
+  XG.State.s.quest.id = XG.QUESTS[0].id;
   XG.MT.render('quest', true); await wait(80);
   const claimBtn = doc.querySelector('#q-claim');
   ok(claimBtn && !claimBtn.disabled, '道途目标达成后领取按钮仍禁用');
   const jadeBefore = XG.State.s.res.jade;
   if (claimBtn) claimBtn.click();
   await wait(150);
-  ok(XG.State.s.quest.idx > 0 || XG.State.s.stats.questsDone > 0, '道途领取未推进');
+  ok(XG.Quest.index() > 0 || XG.State.s.stats.questsDone > 0, '道途领取未推进');
 
   // 寻宝阁
   XG.State.s.res.jade = 5000;
@@ -630,6 +630,71 @@ const uiRandom = () => {
     const fast = Object.assign({}, base, { spd: 1000 });
     const ratio = C.power(fast) / C.power(base);
     ok(ratio <= 1.25, `速度对战力加成未封顶（速度 1000 时放大 ${ratio.toFixed(2)}×）`);
+  }
+
+  /* ── 7.7 回归：任务指针改为按 id 寻址 + 拆掉「万杀」卡点 ── */
+  {
+    const Q = XG.QUESTS;
+    ok(typeof XG.State.s.quest.idx === 'undefined', '存档里仍残留旧的 quest.idx 字段');
+    ok(typeof XG.State.s.quest.id === 'string' || XG.State.s.quest.id === null,
+      '任务指针未改为 id 形式');
+
+    // 旧档按下标迁移
+    const m1 = XG.State.Save.migrate({ version: 1, quest: { idx: 5 } });
+    ok(m1.quest.id === 'q06', `旧下标迁移错误：idx=5 → ${m1.quest.id}（应为 q06）`);
+
+    // 旧档卡在已移除的 q30（旧下标 29）→ 顺延到 q31「首次飞升」
+    const m2 = XG.State.Save.migrate({ version: 1, quest: { idx: 29 } });
+    ok(m2.quest.id === 'q31',
+      `卡在已移除任务的旧档未顺延：idx=29 → ${m2.quest.id}（应为 q31）`);
+
+    // 新格式的 id 优先于旧下标
+    const m3 = XG.State.Save.migrate({ version: 1, quest: { id: 'q12', idx: 5 } });
+    ok(m3.quest.id === 'q12', '新格式的 quest.id 未优先生效');
+
+    // 旧档已完成全部任务（idx 等于旧任务总数 36）→ 保持全部完成
+    const m4 = XG.State.Save.migrate({ version: 1, quest: { idx: 36 } });
+    ok(m4.quest.id === null, `已完成全部任务的旧档被误置为 ${m4.quest.id}`);
+
+    // 完全没有任务字段的存档 → 回到第一个任务
+    const m5 = XG.State.Save.migrate({ version: 1 });
+    ok(m5.quest.id === Q[0].id, '没有任务字段的存档未回到第一个任务');
+
+    // index()/current() 必须真的按 id 反查位置，否则重排后旧档会错位
+    {
+      const backup = XG.State.s.quest.id;
+      XG.State.s.quest.id = Q[7].id;
+      ok(XG.Quest.index() === 7, `Quest.index() 未按 id 反查位置（得到 ${XG.Quest.index()}，应为 7）`);
+      ok(XG.Quest.current() === Q[7], 'Quest.current() 未按 id 命中任务');
+      XG.State.s.quest.id = null;
+      ok(XG.Quest.allDone() === true, '指针为 null 时未判定为全部完成');
+      ok(XG.Quest.current() === null, '指针为 null 时仍返回了任务');
+      XG.State.s.quest.id = '__不存在__';
+      ok(XG.Quest.index() === Q.length, '无效任务 id 未按「已完成」处理');
+      XG.State.s.quest.id = backup;
+    }
+
+    // 端到端：达成「大乘无量」后，下一个引导必须是「首次飞升」而不是万杀
+    {
+      const backup = { id: XG.State.s.quest.id, realm: XG.State.s.realm };
+      XG.State.s.quest.id = 'q29';
+      XG.State.s.realm = 7;
+      const r = XG.Quest.claim();
+      ok(r.ok && XG.State.s.quest.id === 'q31',
+        `「大乘无量」之后应引导至「首次飞升」，实际为 ${XG.State.s.quest.id}`);
+      XG.State.s.quest.id = backup.id;
+      XG.State.s.realm = backup.realm;
+    }
+
+    // 任务链里不应再有「斩妖万头」；它应作为道果存在
+    ok(!Q.some(q => q.title === '斩妖万头'), '任务链里仍残留「斩妖万头」卡点');
+    ok(!!XG.ACHIEVEMENTS.find(a => a.id === 'ac_slay10k'), '缺少「斩妖万头」道果');
+
+    // 「首次飞升」必须紧随「大乘无量」——否则引导会被万杀阻断
+    const iRealm = Q.findIndex(q => q.title === '大乘无量');
+    const iAsc = Q.findIndex(q => q.title === '斩断因果');
+    ok(iRealm >= 0 && iAsc === iRealm + 1,
+      `「首次飞升」未紧随「大乘无量」（大乘 idx=${iRealm}，飞升 idx=${iAsc}）`);
   }
 
   /* ── 8. 重置存档（回归：beforeunload 不得把进度写回） ── */
